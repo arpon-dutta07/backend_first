@@ -21,7 +21,7 @@ const userSchema = new Schema(
             trim: true,
         },
         
-        fullname: {
+        fullName: {
             type: String,
             required: true,
             trim: true,
@@ -87,6 +87,45 @@ userSchema.method.isPasswordCorrect = async function(password){
 // bcrypt.compare(password, this.password) checks if the provided password matches the hashed password stored in the database.
 }
 
-
+// userSchema.methods → lets you add custom functions to all user objects created from this schema.
+// jwt.sign() is a function that creates a token using:
+// Data you want to include inside the token (payload)
+// A secret key to lock it (so no one can fake it)
+// Optional settings like expiry time
+// This is the payload — the information you’re storing inside the token.
+// _id, email, username, fullName → come from the user’s data.
+// this → refers to the specific user calling this function.
+userSchema.methods.generateAccessToken = function() {
+    return jwt.sign(
+        {
+            _id: this._id,
+            email: this.email,
+            username: this.username,
+            fullName: this.fullName
+        },
+        process.env.ACCESS_TOKEN_SECRET,
+        {
+            expiresIn: process.env.ACCESS_TOKEN_EXPIRY
+            // This sets how long the token is valid — for example 1d 
+            // (1 day), which also comes from your .env file.
+        }
+    )
+}
+userSchema.methods.generateRefreshToken = function() {
+return jwt.sign(
+        {
+            _id: this._id,
+        },
+        process.env.REFRESH_TOKEN_SECRET,
+        {
+            expiresIn: process.env.REFRESH_TOKEN_EXPIRY
+            // This sets how long the token is valid — for example 1d 
+            // (1 day), which also comes from your .env file.
+        }
+    )
+}
+// These methods will create JWT tokens for the user.
+// Access tokens are short-lived tokens used for authentication.
+// Refresh tokens are long-lived tokens used to obtain new access tokens when they expire.
 
 export const User = mongoose.model("User", userSchema); 
