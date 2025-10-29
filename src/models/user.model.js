@@ -72,7 +72,7 @@ userSchema.pre("save", async function (next) {
 // this.isModified('password') checks if the password field has been changed or added.
 // “If the password was NOT modified, skip the hashing step and move on.”
 // return next(); → simply means “go to the next step, save the user.”
-    this.password = await bcrypt.hash(this.passsword,10)          // hash password
+    this.password = await bcrypt.hash(this.password,10)          // hash password
 // We use the bcrypt library — a tool for encrypting passwords securely.
 // bcrypt.hash(this.password, 10) takes two things:
 // the plain text password (like "12345")
