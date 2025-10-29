@@ -18,6 +18,7 @@ const registerUser = asyncHandler (async (req, res) =>
 
 
 {
+
 // req.body contains that data.
 // This line destructures the object, meaning it picks out those keys from req.body and saves them in variables:
     const {fullName, email, username , password} = req.body
@@ -46,6 +47,9 @@ const registerUser = asyncHandler (async (req, res) =>
 // two people can’t use the same email.
 
 
+
+
+
 // User is your Mongoose model (the collection in MongoDB that stores user data).
 // Example: User might represent a collection called users that looks like:
 
@@ -65,6 +69,7 @@ const registerUser = asyncHandler (async (req, res) =>
 
 
 
+
     
     const avatarLocalPath = req.files?.avatar[0]?.path;
     //     | Part                         | Meaning                                                          |
@@ -73,7 +78,7 @@ const registerUser = asyncHandler (async (req, res) =>
     // | `req.files?.avatar`          | Access the “avatar” field (array of uploaded avatar files)       |
     // | `req.files?.avatar[0]`       | The **first file** uploaded under the “avatar” name              |
     // | `req.files?.avatar[0]?.path` | The **file path** on your server (where it’s temporarily stored) |
-    const coverImageLocalPath = req.files?.coverImage?.[0]?.path;
+    // const coverImageLocalPath = req.files?.coverImage?.[0]?.path;
     //req.files
     //When a user uploads images (like an avatar or cover image),
     // you’re using Multer as a middleware through this code
@@ -81,9 +86,27 @@ const registerUser = asyncHandler (async (req, res) =>
     // One under the name “avatar”
     // One under the name “coverImage”
 
+    let coverImageLocalPath;
+    if (req.files && Array.isArray(req.files.coverImage)
+        && req.files.coverImage.length > 0) 
+    {
+    
+        coverImageLocalPath = req.files.coverImage[0].path;
+    }
+    // This code safely checks if a cover image was uploaded.
+    // If it was, it retrieves the local file path where Multer stored it temporarily on your server.
+    // If there’s no cover image uploaded, it simply skips this part.
+
+
     if (!avatarLocalPath) {
         throw new ApiError(400, "Avatar file is required");
     }
+    // This condition checks if the avatar image was uploaded.
+    // If not, it throws an error because the avatar is mandatory for registration.
+
+
+
+
 
 
     // Now, upload these images to Cloudinary:
@@ -92,7 +115,6 @@ const registerUser = asyncHandler (async (req, res) =>
     const avatar = await uploadOnCloudinary(avatarLocalPath);
     // uploadOnCloudinary is a function you created to handle uploading files to Cloudinary.
     // It takes the local file path as input and returns the Cloudinary response (like URL, public ID) if successful.
-
     const coverImage = await uploadOnCloudinary(coverImageLocalPath); 
 
     // Upload cover image only if it exists   
@@ -101,6 +123,7 @@ const registerUser = asyncHandler (async (req, res) =>
     }
 
 
+    // User.create() is a Mongoose method that creates a new user document in the database.
     const user = await User.create ({
         fullName,
         avatar: avatar.url,
@@ -109,10 +132,11 @@ const registerUser = asyncHandler (async (req, res) =>
         password,
         username: username.toLowerCase()
     })
-    // User.create() is a Mongoose method that creates a new user document in the database.
     // It takes an object with all the user details and saves it to the users collection.
     // avatar: avatar.url → saves the URL of the uploaded avatar image from Cloudinary.
     // coverImage: coverImage?.url || "" → saves the URL of the cover image if uploaded; otherwise, it saves an empty string.
+
+
 
     const createdUser = await User.findById(user._id)
     .select(
@@ -125,6 +149,9 @@ const registerUser = asyncHandler (async (req, res) =>
         throw new ApiError(500, "something went wrong while creating user. Please try again later.");
     }
     // This condition checks if, for some reason, the user creation failed and no user was returned.
+
+
+
 
     // Finally, send a success response back to the client:
     res.status(201).json(
