@@ -47,7 +47,8 @@ app.use(express.static("public"));
 // “Make everything inside the public folder available publicly.”
 
 app.use(cookieParser());
-
+// This middleware parses cookies from incoming requests.
+// After this, you can access cookies via req.cookies in your route handlers.
 
 
 // routes importing 
