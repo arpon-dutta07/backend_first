@@ -1,7 +1,9 @@
 import { Router } from "express";
 import { registerUser } from "../controllers/user.controller.js";
 import {upload} from "../middlewares/multer.middleware.js"
-
+import { loginUser } from "../controllers/user.controller.js";
+import { verifyJWT } from "../middlewares/auth.middleware.js";
+import { logoutUser } from "../controllers/user.controller.js";
 
 const router = Router();
 
@@ -23,6 +25,20 @@ router.route("/register").post(
         }
     ]),
     registerUser)
+    //this route is for user registration
+
+router.route("/login").post(loginUser);
+//this route is for user login
+//loginUser controller function will handle the login logic in the user.controller.js file
+
+
+//secured routes
+router.route("/logout").post(
+    verifyJWT,
+    logoutUser);
+//this route is for user logout
+//logoutUser controller function will handle the logout logic in the user.controller.js file
+//verifyJWT middleware ensures that only authenticated users can access this route in the auth.middleware.js file
 
 
 export default router;
