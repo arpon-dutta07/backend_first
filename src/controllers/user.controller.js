@@ -5,6 +5,38 @@ import {uploadOnCloudinary} from "../utils/cloudinary.js"
 import { ApiResponse} from "../utils/ApiResponse.js"
 
 
+
+
+const generateAccessAndRefreshTokens = async (userId) => {
+    //userId is the id of the user whose tokens we want to generate  
+  try {
+    const user = await User.findById(userId)
+    const accessToken = user.generateAccessToken()
+    const refreshToken = user.generateRefreshToken()
+
+    user.refreshToken = refreshToken
+    await user.save({validateBeforeSave:false})
+    // Here, we save the refresh token to the user document in the database.
+    // validateBeforeSave: false → skips any validation checks defined in the User schema
+    
+    return { accessToken, refreshToken }
+    //returning both tokens as an object to the frontend
+
+
+  } catch (error) {
+    throw new ApiError(500, "Something went wrong while generating refresh and access token")
+  }
+}
+// This function generates access and refresh tokens for a user based on their userId.
+// It retrieves the user from the database using the provided userId,
+// then calls methods on the user object to create the tokens.
+// If any error occurs during this process, it throws an ApiError with a 500 status code.
+
+
+
+
+
+
 const registerUser = asyncHandler (async (req, res) =>
 // get user details from frontend
 // validation of email , not empty
@@ -167,4 +199,178 @@ const registerUser = asyncHandler (async (req, res) =>
     
 })
 
-export {registerUser};
+
+const loginUser = asyncHandler (async (req, res) =>{
+// get email and password from req.body
+// login with username or email
+// find the user in db
+// if user not found throw error
+// if user found, compare password check password
+// send cookie with jwt token
+
+    const {email, username, password} = req.body
+// This line extracts email, username, and password from the request body sent by the client during login.
+    if(!email || !username)
+    {
+        throw new ApiError(400, "email or username is required to login");
+    }
+    // This condition checks if both email and username were provided during login.
+
+
+
+
+    // Find the user in the database using either email or username
+    const user = await User.findOne(
+    {
+        $or: [{email}, {username}]
+    })
+    // $or operator allows searching for a user by either email or username.
+    // If a user with either the provided email or username exists, it will be returned.
+
+    if(!user){
+        throw new ApiError(404, "User not found with this email or username");
+    }
+    // This code uses the findOne() method to search for a user in the database based on either their email or username.
+    // If no user is found, it throws an error saying “User not found”.
+
+
+    const isPasswordValid = await user.ispasswordCorrect(password)
+    // ispasswordCorrect(password) is a method defined in your User model that checks if the provided password matches the stored hashed password.
+    // It returns true if the password is correct, otherwise false.
+
+    if(!isPasswordValid){
+        throw new ApiError(401, "Invalid password. Please try again.");
+    }
+    // This condition checks if the provided password is correct.
+    // If not, it throws an error indicating that the password is invalid.
+
+    const {accessToken, refreshToken} = await 
+    generateAccessAndRefreshTokens(user._id)
+    // This line calls the generateAccessAndRefreshTokens function (defined earlier) to create new JWT access and refresh tokens for the authenticated user.
+    // It passes the user’s unique ID (user._id) to generate the tokens.
+
+     const loggedInUser = await User.findById(user._id)
+     .select(
+        "-password -refreshToken"
+    )
+    // loggedInUser is fetched from the database using findBy)
+    // .select("-password -refreshToken") excludes the password and refreshToken fields from the returned user object for security reasons.
+    // This ensures that sensitive information is not sent back to the client.
+
+
+    //cookie options
+
+    const options = {
+        httpOnly: true,
+        secure: true,
+    }
+    // These options configure how cookies should behave when sending JWT tokens.
+    // httpOnly: true → makes sure the cookie cannot be accessed via JavaScript (prevents XSS attacks).
+    // secure: true → ensures the cookie is only sent over HTTPS connections (for added security).
+
+    return res
+    .status(200)
+    .cookie("accessToken", accessToken, options)
+    .cookie("refreshToken", refreshToken, options)
+    .json(
+        new ApiResponse(
+            200,
+        {
+            user: loggedInUser, accessToken, refreshToken
+            // building the JSON response body that will be sent to the frontend.
+            // This is the actual data being sent back to the client upon successful login.
+            //user → send the logged-in user's data
+            // accessToken → send the access token
+            // refreshToken → send the refresh token
+        },
+        "User logged in successfully"
+        )
+    )
+    // This code sets two cookies in the response:
+    // accessToken cookie contains the JWT access token.
+    // refreshToken cookie contains the JWT refresh token.
+    // Both cookies use the options defined earlier for security.
+
+
+// STEP 1: .status(200)
+// This just sets the HTTP status code of the response.
+// Think of it like writing on the envelope:
+// "Hey browser, this request was successful (200)".
+// 🧠 It doesn’t send anything yet — it just sets a label.
+// 🧩 STEP 2: .cookie("accessToken", accessToken, options)
+// Now this adds cookies to the same response object.
+// 👉 It’s like saying:
+// “Okay response, also attach this cookie before sending.”
+// It’s still the same single response, you’re just adding extra things to it (like toppings on a pizza 🍕).
+// Where this cookie is stored:
+// When the browser receives the response:
+// It checks if there are any cookies
+// If yes → it stores them automatically in the browser’s “Cookies storage”
+// 📍You can see them in:
+// Developer Tools → Application → Cookies
+// So cookies are stored in the browser, not in your backend.
+
+// STEP 3: .json(...)
+// This is the final step — it sends the whole response (with status, cookies, and JSON body) back to the browser.
+// So:
+// .status(200) → sets success code ✅
+// .cookie(...) → attaches tokens ✅
+// .json(...) → sends data ✅
+//this is send to the frontend.
+
+})
+
+
+
+
+const logoutUser = asyncHandler (async (req, res) =>
+// clear cookies from frontend
+// delete refresh token from db
+// send response
+{
+    User.findByIdAndUpdate(
+        req.user._id,
+        {
+            $set:
+            {
+                refreshToken: undefined
+            }
+        },
+        {
+            new: true,
+            //new: true tells Mongoose: “Return the updated document instead of the old one.”
+        }
+    )
+    // This code finds the user in the database by their unique ID (req.user._id) and updates their document.
+    // $set: { refreshToken: undefined } → This part sets the refreshToken field to undefined, effectively deleting it from the user’s document.
+    // This is important for security — it ensures that the refresh token can no longer be used to get new access tokens after logout.
+    // { new: true } → This option tells Mongoose to return the updated user document after the change is made.
+    // However, in this case, we’re not using the returned document; we just want to perform the update.
+
+
+
+    // Clear the cookies from the client
+    const options = {
+        httpOnly: true,
+        secure: true,
+    }
+    // These options configure how cookies should behave when sending JWT tokens.
+    // httpOnly: true → makes sure the cookie cannot be accessed via JavaScript (prevents XSS attacks).
+    // secure: true → ensures the cookie is only sent over HTTPS connections (for added security).
+    return res
+    .status(200)
+    .clearCookie("accessToken", options)
+    .clearCookie("refreshToken", options)
+    .json(new ApiResponse(200,"User logged out successfully"));
+    // This code clears the accessToken and refreshToken cookies from the client’s browser.
+    // .clearCookie(...) removes the specified cookie.
+    // Finally, it sends a JSON response back to the client indicating that the user has been logged out successfully.
+    // options are passed to ensure the cookies are removed securely.
+    // options mean that the cookies will be cleared with the same security settings as when they were set.
+});
+
+export {
+    registerUser,
+    loginUser,
+    logoutUser
+};
