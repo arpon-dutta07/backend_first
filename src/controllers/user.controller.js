@@ -3,7 +3,7 @@ import {ApiError} from "../utils/ApiError.js"
 import {User} from "../models/user.model.js"
 import {uploadOnCloudinary} from "../utils/cloudinary.js"
 import { ApiResponse} from "../utils/ApiResponse.js"
-
+import jwt from "jsonwebtoken";
 
 
 
@@ -369,8 +369,104 @@ const logoutUser = asyncHandler (async (req, res) =>
     // options mean that the cookies will be cleared with the same security settings as when they were set.
 });
 
+
+
+
+const refreshAccessToken = asyncHandler (async (req, res) =>
+{
+    // get refresh token from cookies
+    // verify refresh token
+    // generate new access token
+    // generate new refresh token
+    // save refresh token in db
+    // send response
+
+    const incomingRefreshToken = req.cookies.refreshToken 
+    || req.body.refreshAccessToken
+
+    // This line tries to get the refresh token from two places:
+    // 1. From the cookies sent with the request (req.cookies.refreshToken)
+    // 2. From the request body (req.body.refreshAccessToken)
+    // It uses the logical OR operator (||) to check both places.
+    // If the token is found in cookies, it uses that; otherwise, it checks the request body.
+
+    if(!incomingRefreshToken)
+    {
+        throw new ApiError (401, "Unauthorized request")
+    }
+
+try {
+    
+        const decodedToken = jwt.verify(incomingRefreshToken, process.env.REFRESH_TOKEN_SECRET)
+        // This line verifies the incoming refresh token using the secret key stored in environment variables.
+        // If the verification fails, it throws an error.
+        jwt.verify
+        (incomingRefreshToken, process.env.REFRESH_TOKEN_SECRET)
+    
+    
+        const user = await User.findById (decodedToken?._id)
+        // This line fetches the user from the database using the user ID (_id) extracted from the decoded refresh token.
+        if(!user)
+        {
+            throw new ApiError (401, "Invalid refresh token")
+        }
+        // This condition checks if a user was found in the database.
+        // If no user is found, it throws an error indicating that the refresh token is invalid.    
+    
+    
+        if(incomingRefreshToken !== user?.refreshToken)
+        {
+            throw new ApiError (401, "Refresh token expired")
+        }
+        // This condition compares the incoming refresh token with the one stored in the user’s document.
+        // If they don’t match, it throws an error indicating that the refresh token is invalid.
+    
+    
+        // Generate new access and refresh tokens
+        const options = 
+        {
+            httpOnly: true,
+            secure: true,
+        }
+    
+        const {accessToken, newRefreshToken} = await generateAccessAndRefreshTokens(user._id)
+        // const {accessToken, refreshToken} mesns that we are destructuring the object returned by the function generateAccessAndRefreshTokens.
+        // const {accessToken, refreshToken} = {...}
+        // This syntax is known as object destructuring.
+        // It allows us to extract properties directly into separate variables.
+        // In this case, it’s extracting accessToken and refreshToken from the result of generateAccessAndRefreshTokens(user._id).
+        // This line generates new access and refresh tokens for the user.
+        // It’s likely calling another function (generateAccessAndRefreshTokens) to do this.
+    
+    
+        return res
+        .status(200)
+        .cookie("accessToken", accessToken, options)        
+        .cookie("refreshToken", newRefreshToken, options)
+        .json(
+            new ApiResponse(
+                200,
+            { accessToken, refreshtoken: newRefreshToken },
+            "Access token refreshed successfully"
+            )
+        );
+        // This code sets two cookies in the response:
+        // accessToken cookie contains the new JWT access token.
+        // refreshToken cookie contains the new JWT refresh token.
+        // Both cookies use the options defined earlier for security.
+    
+    
+} catch (error) {
+    throw new ApiError (401, error?.message || "Invalid refresh token")
+    
+}
+
+
+})
+
 export {
     registerUser,
     loginUser,
-    logoutUser
+    logoutUser,
+    refreshAccessToken
 };
