@@ -210,12 +210,12 @@ const loginUser = asyncHandler (async (req, res) =>{
 
     const {email, username, password} = req.body
 // This line extracts email, username, and password from the request body sent by the client during login.
-    if(!email || !username)
+    if(!email && !username)
     {
         throw new ApiError(400, "email or username is required to login");
     }
-    // This condition checks if both email and username were provided during login.
-
+    // This condition checks if neither email nor username is provided.
+    // If both are missing, it throws an error indicating that at least one is required for login.
 
 
 
@@ -234,7 +234,7 @@ const loginUser = asyncHandler (async (req, res) =>{
     // If no user is found, it throws an error saying “User not found”.
 
 
-    const isPasswordValid = await user.ispasswordCorrect(password)
+    const isPasswordValid = await user.isPasswordCorrect(password)
     // ispasswordCorrect(password) is a method defined in your User model that checks if the provided password matches the stored hashed password.
     // It returns true if the password is correct, otherwise false.
 
