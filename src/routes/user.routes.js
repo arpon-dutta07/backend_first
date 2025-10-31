@@ -4,7 +4,7 @@ import {upload} from "../middlewares/multer.middleware.js"
 import { loginUser } from "../controllers/user.controller.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
 import { logoutUser } from "../controllers/user.controller.js";
-
+import { refreshAccessToken } from "../controllers/user.controller.js";
 const router = Router();
 
 
@@ -39,6 +39,6 @@ router.route("/logout").post(
 //this route is for user logout
 //logoutUser controller function will handle the logout logic in the user.controller.js file
 //verifyJWT middleware ensures that only authenticated users can access this route in the auth.middleware.js file
-
+router.route("/refresh-token").post(refreshAccessToken);
 
 export default router;
