@@ -8,7 +8,7 @@ const subscriptionSchema = new Schema({
     },
 
     channel:{
-        type: mongoose.Schema.Types.ObjectId, // one to ehoom subscriber is  "subscribing"
+        type: mongoose.Schema.Types.ObjectId, // one to whom subscriber is  "subscribing"
         ref: "User",
     }
 },
@@ -19,5 +19,5 @@ const subscriptionSchema = new Schema({
 
 
 
-export  const Subscrition = mongoose.model("Subscrition", subscriptionSchema);
+export  const Subscription = mongoose.model("Subscription", subscriptionSchema);
 
