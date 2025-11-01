@@ -200,6 +200,9 @@ const registerUser = asyncHandler (async (req, res) =>
 })
 
 
+
+
+
 const loginUser = asyncHandler (async (req, res) =>{
 // get email and password from req.body
 // login with username or email
@@ -323,6 +326,8 @@ const loginUser = asyncHandler (async (req, res) =>{
 
 
 
+
+
 const logoutUser = asyncHandler (async (req, res) =>
 // clear cookies from frontend
 // delete refresh token from db
@@ -368,6 +373,9 @@ const logoutUser = asyncHandler (async (req, res) =>
     // options are passed to ensure the cookies are removed securely.
     // options mean that the cookies will be cleared with the same security settings as when they were set.
 });
+
+
+
 
 
 
@@ -461,12 +469,311 @@ try {
     
 }
 
+})
+
+
+
+
+
+
+// Change current password to new password using old password using jwt token and old password
+const changeCurrentPasswoed = asyncHandler (async (req, res) =>
+{
+    const {oldPassword , newPassword} = req.body
+    const user = await User.findById(req.user?._id)// get user id from req.user
+    // this req.user is set in auth middleware after verifying jwt token
+    // find user in db
+    const PasswordCorrect = await user.isPasswordCorrect(oldPassword)
+    // check old password
+    //isPasswordCorrect is a method defined in user model to compare password
+    if(!PasswordCorrect)
+    {
+        throw new ApiError (400, "Old password is incorrect")
+    }
+    // if old password is incorrect throw error
+
+    user.password = newPassword
+    await user.save({validateBeforeSave:false}) 
+    // save new password
+    // validateBeforeSave:false → skips any validation checks defined in the User schema
+
+    return res
+    .status(200)
+    // send response to the browser
+    .json(
+        new ApiResponse(
+            200,
+            {},
+            "Password changed successfully"
+        )
+    )
+    // send response to the frontend
+})
+
+
+
+
+const getCurrentUser = asyncHandler(async (req, res)=>{
+    return res
+    .status(200)
+    .json(200, req.user, "current user fetched successfully")
+})
+// cific tasks such as registering a new user, logging in a user, refreshing access tokens, etc.
+// These functions are designed to be imported and used elsewhere in your application.
+//req.user is set in auth middleware after verifying jwt token
+// The flow Request ➜ verifyJWT (middleware) ➜ getCurrentUser (controller)
+
+
+
+
+//updating AccountDetails.
+const updateUserAccountDetails = asyncHandler(async (req, res)=>
+{
+    const {fullName, email} = req.body
+    // get data from req.body
+
+    if(!fullName || !email)
+    {
+        throw new ApiError(400, "Fullname and Email are required")
+    }
+    // check if fullname and email is present
+
+    const user = User.findByIdAndUpdate
+    (
+        req.user?._id,
+    //req.user.id is set in auth middleware after verifying jwt token
+    // .id is used to access the _id property of the user object within req.user.
+    // ? is optional chaining operator. It prevents errors if req.user is null or undefined. 
+        {
+            $set:
+            {
+                fullName,
+                email: email
+            }
+        },
+        {new:true}//return updated user
+    ).select("-password")
+    // select(-password) exclude password from response
+
+    return res
+    .status(200)
+    .json(new ApiResponse(200,user,"User account details updated successfully"))
+    //send response to the frontend
+
+});
+
+
+
+
+//update Avatar
+const updateUserAvatar = asyncHandler (async(req, res)=>{
+//get avatar from req.file.path
+
+const avatarLocalPath = req.file.path;
+//This line gets the local path where the uploaded avatar image is saved on the server.
+//It assumes that the uploaded file is available through req.file.path.
+
+if(!avatarLocalPath)
+{
+    throw new ApiError(400, "Please provide an avatar image")
+}
+//This condition checks if the avatarLocalPath variable is falsy (e.g., undefined or empty).
+//If so, it throws an error indicating that an avatar image must be provided.
+
+const avatar = await uploadOnCloudinary(avatarLocalPath);
+//This line uploads the avatar image located at avatarLocalPath to Cloudinary using the uploadOnCloudinary function.
+//The result of this operation is assigned to the avatar variable.
+
+if(!avatar.url)
+{
+    throw new ApiError(400, "Error whileuploading an avatar")
+}
+//This condition checks if the avatar variable is falsy (e.g., undefined or empty).
+//If so, it throws an error in
+
+
+const user = await User.findByIdAndUpdate
+(
+    req.user?._id,//req.user.id is set in auth middleware after verifying jwt token
+    {
+        $set:{
+            avatar: avatar.url,
+        }
+    },
+    {new:true}//return updated user
+).select("-password")
+//This line updates the user’s avatar URL in the database using findByIdAndUpdate.
+//It sets the avatar field to the url value obtained from uploading the avatar to Cloudinary.
+//The new:true option specifies that the updated user document should be returned.
+//The select("-password") part excludes the password field from the returned user document.
+return res
+.status(200)
+.json(new ApiResponse(200, user, "Avatar Updated Successfully"))
+//This code sends a response to the client with the following components:
+//Status Code: 200 OK
+//JSON Response Body: A new ApiResponse instance containing the following data:
+//statusCode: 200
+//data: The updated user document without the password field (-password)
+//message: "Avatar Updated Successfully"
+})
+
+
+
+
+
+// update cover image
+const updateCoverImage = asyncHandler (async(req,res)=>{
+    const coverImageLocalPath = req.file?.path;
+
+    if(!coverImageLocalPath)
+    {
+        throw new ApiError(400, "Please provide a cover image")
+    }
+
+    const coverImage = await uploadOnCloudinary(coverImageLocalPath);
+    if(!coverImage.url)
+    {
+        throw new ApiError(400, "Error while uploading a cover image")
+    }
+
+    const user = await User.findByIdAndUpdate
+    (
+        req.user?._id,
+        {
+            $set:{
+                coverImage: coverImage.url,
+            }
+        },
+        {new:true}
+    ).select("-password")
+
+
+    return res
+    .status(200)
+    .json(new ApiResponse(200, user, "Cover Image Updated Successfully"))
+})
+//This code defines a controller function called updateCoverImage which handles updating a user’s cover image.
+// It takes a request (req) and a response (res) as parameters.
+// The function first retrieves the local path of the uploaded cover image from the request object.
+// Then, it validates whether the cover image path is provided. If not, it throws an error.
+// Next, it attempts to upload the cover image to Cloudinary using the uploadOnCloudinary function.
+// After successful upload, it checks if the URL of the uploaded cover image is valid. If not, it throws an error.
+// Finally, it updates the user’s cover image URL in the database using findByIdAndUpdate.
+// The new:true option indicates that
+
+
+
+
+// Get Channel Profile
+const getUserChannelProfile = asyncHandler(async(req,res)=>{
+    const {username} = req.params
+    // req.params means that the username parameter is expected to be included in the route definition or URL.
+    // get username from params
+    
+    if(!username?.trim())
+    // trim() remove white spaces from start and end of strings
+    {
+        throw new ApiError(400, "Username is missing")
+    }
+
+    const channel = await User.aggregate([
+        {
+            $match:{
+                //$match works like .find({ ... })
+                username: username?.toLowerCase()
+                //username means username field in db and the other side is username paramter.
+            }
+        },
+        {
+            $lookup:{
+                //$lookup performs a left outer join between the users collection and the subscriptions collection based on certain conditions.
+                from:"subscriptions", // Look into subscriptions collection
+                localField:"_id", //_id is the field in the users collection that matches...
+                foreignField:"channel", //channel field in subscription collection.. Match where subscription.channel = user._id
+                as:"subscribers" //Name the result array as subscribers
+
+            }
+        },
+        {
+            $lookup:
+            {
+                from:"subscriptions", // Look into subscriptions collection
+                localField:"_id", // _id is the field in the users collection that matches...
+                foreignField:"subscriber", // subscriber field in subscription collection.. Match where subscription.subscriber = user._id
+                as:"subscribedTo" // Name the result array as subscribedTo
+            }
+        },
+        {
+            $addFields:{
+            // $addFields is used to add new fields to documents in the aggregation pipeline on the user.
+                subscribersCount:{
+                    $size:"$subscribers"
+                },//$size returns the number of elements in an array.
+                ChannelSubscribedToCount: {
+                    $size:"$subscribedTo"
+                },// we have to use '$' sign in  $subscribers and $subscribedTo because these are now became fiels / array.
+                isSubscribed:{
+                    $cond:{
+                        if: {$in: [req.user?._id, "$subscribers.subscriber"]},
+                        then: true,
+                        else: false,
+                    }
+                }
+            }
+        },
+        {
+            $project:{
+                // $project is used to control which fields are included or excluded in the output documents.
+                fullName:1,
+                username:1,
+                email:1,
+                avatar:1,
+                coverImage:1,
+                subscribersCount:1,
+                ChannelSubscribedToCount:1,
+                isSubscribed:1
+                // 1 means include the field in the output document.
+            }
+        }
+        
+    ])
+
+    if(!channel?.length)
+    {
+        throw new ApiError(404, `No channel found with username ${username}`)
+    }
+    // This code checks if the channel array is empty (i.e., no matching channels were found).
+    // If so, it throws an error indicating that no channel was found with the given username.
+
+    return res
+    .status(200)
+    .json(
+        new ApiResponse(200, channel[0], "Channel profile fetched successfully")
+    )
+    // This code sends a response to the client with the following components:
+    // Status Code: 200 OK
+    // JSON Response Body: A new ApiResponse instance containing the following data:
+    // statusCode: 200
+    // data: The first element of the channel array (assuming there's at least one channel)
+    // message: "Channel profile fetched successfully"
 
 })
+
+
+
+
+
+ 
 
 export {
     registerUser,
     loginUser,
     logoutUser,
-    refreshAccessToken
+    refreshAccessToken,
+    changeCurrentPasswoed,
+    getCurrentUser,
+    updateUserAccountDetails,
+    updateUserAvatar,
+    updateCoverImage,
+    getUserChannelProfile
 };
