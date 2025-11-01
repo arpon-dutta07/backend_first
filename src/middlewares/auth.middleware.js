@@ -57,4 +57,8 @@ try {
 }
 })
 
+//this function verifies a JSON Web Token (JWT) provided in an HTTP request's authorization header or cookie.
+// It checks whether the token is valid and belongs to a registered user. If successful, it attaches the user's information to the request object (req.user), allowing further processing based on the authenticated user.
+// In summary, this code ensures that only authorized users can access certain routes or perform specific actions within your application.
+
 
