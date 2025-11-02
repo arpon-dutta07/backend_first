@@ -4,6 +4,7 @@ import {User} from "../models/user.model.js"
 import {uploadOnCloudinary} from "../utils/cloudinary.js"
 import { ApiResponse} from "../utils/ApiResponse.js"
 import jwt from "jsonwebtoken";
+import mongoose from 'mongoose';
 
 
 
@@ -477,7 +478,7 @@ try {
 
 
 // Change current password to new password using old password using jwt token and old password
-const changeCurrentPasswoed = asyncHandler (async (req, res) =>
+const changeCurrentPassword = asyncHandler (async (req, res) =>
 {
     const {oldPassword , newPassword} = req.body
     const user = await User.findById(req.user?._id)// get user id from req.user
@@ -705,8 +706,11 @@ const getUserChannelProfile = asyncHandler(async(req,res)=>{
         },
         {
             $addFields:{
-            // $addFields is used to add new fields to documents in the aggregation pipeline on the user.
-                subscribersCount:{
+            // $addFields adds new fields only inside the aggregation result.
+            // It does NOT update the database.
+            // Think of it as creating extra fields for output only, not saving permanently in MongoDB.
+            // Temporary fields exist in → channel[0] response object    
+            subscribersCount:{
                     $size:"$subscribers"
                 },//$size returns the number of elements in an array.
                 ChannelSubscribedToCount: {
@@ -718,6 +722,9 @@ const getUserChannelProfile = asyncHandler(async(req,res)=>{
                         then: true,
                         else: false,
                     }
+                    // $cond is used to conditionally evaluate expressions and return different values based on a condition.
+                    // $in checks if the req.user._id exists in the subscribers.subscriber array.
+                    // If it does, then isSubscribed becomes true; otherwise, it becomes false.
                 }
             }
         },
@@ -762,6 +769,76 @@ const getUserChannelProfile = asyncHandler(async(req,res)=>{
 
 
 
+// Watch History
+const getWatchHistory = asyncHandler(async(req,res)=>{
+    const user = await User.aggregate([
+        {
+            $match:{
+                _id: new mongoose.Types.ObjectId(req.user._id),
+            // This condition filters the aggregation results to include only those documents where the _id field matches the ObjectId representation of req.user._id.
+            // $match = filter users
+            // req.user._id = ID of the currently logged-in user (set by auth middleware)
+            // new mongoose.Types.ObjectId() converts the ID into MongoDB ObjectId format
+            }
+        },
+        {
+            $lookup:{
+                from:"videos",// Look into videos collection in the video schema file
+                localField:"watchHistory", // localField is the field in the users collection that contains an array of video IDs representing the user's watch history.
+                foreignField:"_id",// foreignField is the field in the videos collection that corresponds to the video IDs stored in the user's watchHistory array.
+                as:"watchHistory",// as specifies the name of the new array field that will be added to the user documents to hold the matched video documents.
+                // Nested lookup to get owner details of each video
+                
+                pipeline:[
+                    {
+                        $lookup:{
+                            from:"users",// Look into users collection to get owner details of each video
+                            localField:"owner",// localField is the field in the videos collection that contains the ID of the user who owns (uploaded) the video.
+                            foreignField:"_id",// foreignField is the field in the users collection that corresponds to the user IDs stored in the owner field of the videos collection.
+                            as:"owner",// as specifies the name of the new array field that will be added to each video document to hold the matched user (owner) documents.
+                           
+
+                            // Only take necessary owner fields
+                            pipeline:[
+                                {
+                                    $project:{
+                                        fullName:1,
+                                        username:1,
+                                        avatar:1
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        $addFields:{
+                            // here  $addFields Converts array → single object
+                            // Because each video has only one owner
+                            // So we take the first element from the owner array and assign it to the owner field.(overwrite)
+                            owner:{
+                                $first: "$owner"
+                            }
+                        }
+                    }
+                ]
+            }
+        }, 
+    ])
+    
+    return res
+    .status(200)
+    .json(
+        new ApiResponse (
+            200,
+            user[0].watchHistory,//user[0] because aggregate always returns an array
+            //user[0].watchHistory is:
+            // 👉 The array of videos the user watched
+            // with video details and video owner info included!
+            "Watch history fetched successfully"
+        )
+    )
+})
+
 
  
 
@@ -770,10 +847,11 @@ export {
     loginUser,
     logoutUser,
     refreshAccessToken,
-    changeCurrentPasswoed,
+    changeCurrentPassword,
     getCurrentUser,
     updateUserAccountDetails,
     updateUserAvatar,
     updateCoverImage,
-    getUserChannelProfile
+    getUserChannelProfile,
+    getWatchHistory
 };
